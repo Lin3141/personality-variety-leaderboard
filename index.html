@@ -693,7 +693,10 @@ function modelView() {
   const spreadCard = el("section", { class: "card" },
     el("div", { class: "card-head" },
       el("div", {}, el("h2", { text: "Score spread" }),
-        el("div", { class: "card-sub", text: "Wider curve = more variety" }))),
+        // Name the text type: with the page on Overall, the By trait card above
+        // averages all six while these charts show one, so the two disagree.
+        el("div", { class: "card-sub",
+                    text: `${TYPE[shown].about}, ${lengthOf(state.floor).label} \u00b7 wider curve = more variety` }))),
     el("div", { class: "chart-tools" }, tabs,
       el("div", { class: "legend" },
         el("span", {}, el("i", { class: "key", style: "background: var(--accent)" }), m.label),
