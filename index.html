@@ -677,7 +677,7 @@ function modelView() {
     el("div", { class: "charts" }, TRAITS.map(t => el("figure", { class: "chart" },
       el("figcaption", {}, el("b", { text: t.label }), el("span", { text: fmtMetric(traitValue(shownCell, t.key)) })),
       el("div", { class: "chart-host", "data-type": shown, "data-trait": t.key })))),
-    el("p", { class: "chart-note", text: `Grey curve: all ${int(LB.human[shown].kde_n)} human ${TYPE[shown].label} texts \u2014 the same sample the percentages divide by.` }));
+    el("p", { class: "chart-note", text: `Grey curve: all ${int(LB.human[shown].n)} human ${TYPE[shown].label} texts \u2014 the same sample the percentages divide by.` }));
 
   const traitRows = TRAITS.map(t => ({ t, v: traitValue(c, t.key), h: humanValue(type, t.key) }));
   const traitScale = metricScale(traitRows.flatMap(r => [r.v, r.h]));
@@ -723,7 +723,7 @@ function drawChart(host) {
 // ---------- about ----------
 function aboutView() {
   // Documents behind the human SD, per text type; the same sample the KDE curves draw.
-  const humanDocs = TYPES.map(t => LB.human[t].kde_n ?? LB.human[t].n);
+  const humanDocs = TYPES.map(t => LB.human[t].n);
   const sections = [
     ["What we measure", [
       "Each model wrote about 100 texts per text type and length, with default settings.",
