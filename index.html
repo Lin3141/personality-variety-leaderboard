@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Personality Variety Leaderboard</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f6f5f2; --panel: #ffffff; --panel-2: #f0eee9; --track: #ebe8e2; --active: #e9e6e0;
+  --ink: #1c1b19; --ink-2: #5f5b55; --line: #e3e0da;
+  --accent: #1baf7a; --marker: #1c1b19; --human: #9a958d; --link: #2563c9; --focus: #2a78d6;
+  --shadow: 0 8px 24px rgba(0,0,0,.12);
+  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #1c1b19; --panel: #252321; --panel-2: #2e2c29; --track: #1a1917; --active: #34312d;
+    --ink: #f1eee8; --ink-2: #aba69e; --line: #3a3733;
+    --accent: #199e70; --marker: #f1eee8; --human: #8f8a82; --link: #6aa6f5; --focus: #3987e5;
+    --shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #1c1b19; --panel: #252321; --panel-2: #2e2c29; --track: #1a1917; --active: #34312d;
+  --ink: #f1eee8; --ink-2: #aba69e; --line: #3a3733;
+  --accent: #199e70; --marker: #f1eee8; --human: #8f8a82; --link: #6aa6f5; --focus: #3987e5;
+  --shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--sans); }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* top bar */
+.topbar { position: sticky; top: 0; z-index: 20; background: var(--page); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1440px; margin: 0 auto; height: 56px; padding: 0 32px; display: flex; align-items: center; gap: 28px; }
+.brand { font-family: var(--serif); font-size: 21px; text-decoration: none; white-space: nowrap; }
+.nav { display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+.nav a { padding: 6px 12px; border-radius: 8px; text-decoration: none; color: var(--ink-2); font-size: 14px; white-space: nowrap; }
+.nav a:hover { color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--active); color: var(--ink); }
+.theme-btn { margin-left: auto; flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+
+/* page */
+.wrap { max-width: 1440px; margin: 0 auto; padding: 40px 32px 72px; }
+.page-head { margin-bottom: 28px; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: 36px; line-height: 1.15; letter-spacing: -.01em; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.badge { font-family: var(--sans); font-size: 15px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
+.lede { margin: 0; max-width: 80ch; font-size: 16px; color: var(--ink-2); }
+.meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin-top: 16px; font-size: 14px; color: var(--ink-2); }
+.meta-row .controls { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.ctl { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.two-up { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 24px; align-items: start; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 7px; font-size: 13px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+
+/* cards and bar lists */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.card.wide { grid-column: 1 / -1; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.card-head h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 21px; display: flex; align-items: center; gap: 10px; }
+.card-head h2 a { text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+.card-head h2 a:hover { text-decoration: underline; }
+.card-sub { font-size: 13px; color: var(--ink-2); }
+.marker-key { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.marker-key i { display: inline-block; width: 2px; height: 14px; background: var(--marker); }
+.bar-list { list-style: none; margin: 0; padding: 8px 20px 14px; }
+.bar-row { display: grid; grid-template-columns: 28px minmax(110px, 190px) 24px minmax(0, 1fr) 52px; align-items: center; gap: 10px; min-height: 38px; }
+.card.wide .bar-row { grid-template-columns: 28px minmax(140px, 240px) 24px minmax(0, 1fr) 60px; }
+/* The narrow cards drop the org mark so the bar keeps enough room to compare. */
+.card:not(.wide) .bar-row { grid-template-columns: 26px minmax(96px, 150px) minmax(0, 1fr) 46px; }
+.card:not(.wide) .bar-row > .logo { display: none; }
+.type-row, .card .type-row { grid-template-columns: 28px minmax(90px, 160px) minmax(0, 1fr) 52px; }
+.rank-box { width: 26px; height: 26px; display: grid; place-items: center; font-size: 12px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 5px; font-variant-numeric: tabular-nums; }
+.icon-box { border: 0; font-size: 16px; }
+.bar-name { font-size: 15px; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-name:hover { text-decoration: underline; }
+.type-row.current .bar-name { font-weight: 700; }
+.logo { width: 24px; height: 24px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); border-radius: 50%; }
+.logo.big { width: 48px; height: 48px; font-size: 20px; }
+/* Bar grows from a square baseline; the thin marker is human writing (100%). */
+.track { position: relative; display: block; height: 18px; background: var(--track); border-radius: 3px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 0 4px 4px 0; }
+.marker { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--marker); }
+.bar-value { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.head-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.card-foot { padding: 14px; text-align: center; border-top: 1px solid var(--line); }
+.card-foot a { color: var(--link); text-decoration: none; }
+.card-foot a:hover { text-decoration: underline; }
+
+/* leaderboard */
+.board-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.sidebar { position: sticky; top: 80px; }
+.side-title { margin: 0 0 8px 4px; font-size: 13px; color: var(--ink-2); }
+.side-list { list-style: none; margin: 0; padding: 0; }
+.side-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; text-decoration: none; font-size: 15px; }
+.side-item:hover { background: var(--panel-2); }
+.side-item.active { background: var(--active); }
+.side-item .check { margin-left: auto; color: var(--accent); }
+.icon { width: 20px; text-align: center; }
+.table-card { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 14px 16px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+td.trait { color: var(--ink-2); }
+th.divide, td.divide { border-left: 1px solid var(--line); }
+th { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+th button { border: 0; background: none; padding: 0; cursor: pointer; font-weight: 600; color: inherit; display: inline-flex; align-items: center; gap: 4px; }
+th .arrow { font-size: 11px; opacity: .7; }
+tbody tr:last-child td { border-bottom: 0; }
+th.l, td.l { text-align: left; }
+th.c, td.c { text-align: center; }
+th.rank, td.rank { width: 64px; border-right: 1px solid var(--line); }
+/* Rank and model stay pinned while a narrower screen scrolls the score columns. */
+th.rank, td.rank, th.l, td.l { position: sticky; z-index: 1; background: var(--panel); }
+th.rank, td.rank { left: 0; }
+th.l, td.l { left: 64px; box-shadow: 1px 0 0 var(--line); }
+td.rank { font-size: 15px; }
+.model-cell { display: flex; align-items: center; gap: 12px; }
+.model-name { font-weight: 600; text-decoration: none; }
+a.model-name:hover { text-decoration: underline; }
+.model-sub { font-size: 12px; color: var(--ink-2); }
+tr.human td { background: var(--panel-2); }
+tr.row:hover td { background: var(--panel-2); }
+.variety-cell { display: inline-flex; align-items: center; gap: 10px; }
+.variety-cell .track { width: 92px; height: 10px; }
+.variety-cell .marker { top: -3px; bottom: -3px; }
+.variety-cell b { width: 42px; text-align: right; }
+.table-note { margin: 10px 4px 0; font-size: 13px; color: var(--ink-2); }
+
+/* model page */
+.crumbs { margin-bottom: 14px; font-size: 14px; color: var(--ink-2); }
+.crumbs a { color: var(--ink-2); text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.model-head { display: flex; align-items: center; gap: 16px; }
+.model-head h1 { margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 0 24px; }
+.tile { padding: 16px 20px; }
+.tile-label { font-size: 13px; color: var(--ink-2); }
+.tile-value { font-family: var(--serif); font-size: 34px; line-height: 1.2; }
+.tile-value.text { font-size: 22px; line-height: 1.5; overflow-wrap: anywhere; }
+.tile-sub { font-size: 13px; color: var(--ink-2); }
+.stack { display: grid; gap: 24px; }
+.chart-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 24px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key { display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.charts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; padding: 16px 24px 12px; }
+.chart { margin: 0; min-width: 0; }
+.chart figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; font-size: 14px; }
+.chart figcaption span { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.chart-host { margin-top: 6px; }
+.chart-host svg { display: block; }
+.chart-note { margin: 0; padding: 0 24px 18px; font-size: 13px; color: var(--ink-2); }
+
+/* about */
+.about-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.about-card { padding: 22px 24px; }
+.about-card h2 { margin: 0 0 8px; font-family: var(--serif); font-weight: 400; font-size: 22px; }
+.about-card p { margin: 0 0 8px; color: var(--ink-2); }
+
+.tip { position: fixed; z-index: 50; pointer-events: none; max-width: 320px; padding: 8px 10px; font-size: 13px; white-space: pre-line; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.tip[hidden] { display: none; }
+
+@media (max-width: 1000px) {
+  .board-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .sidebar { position: static; }
+  .side-title { display: none; }
+  .side-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .side-item { white-space: nowrap; border: 1px solid var(--line); background: var(--panel); }
+  .side-item .check { display: none; }
+  .charts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .card-grid, .about-grid { grid-template-columns: minmax(0, 1fr); }
+  .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .meta-row .controls { margin-left: 0; }
+}
+@media (max-width: 640px) {
+  /* Brand and theme on the first line, the three nav links on the second. */
+  .topbar-inner { height: auto; flex-wrap: wrap; padding: 10px 16px 6px; gap: 6px 12px; }
+  .brand { font-size: 18px; }
+  .nav { order: 3; width: 100%; }
+  .nav a { padding: 6px 10px; }
+  .meta-row .controls { width: 100%; }
+  .ctl { width: 100%; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .ctl .seg { flex-wrap: nowrap; }
+  .seg button { padding: 6px 8px; }
+  .wrap { padding: 24px 16px 56px; }
+  h1 { font-size: 28px; }
+  .card-head { padding: 14px 16px; flex-wrap: wrap; }
+  .bar-list { padding: 8px 16px; }
+  /* On a phone each row is two lines: rank, name and value, then the bar. */
+  .bar-row, .card.wide .bar-row, .card .type-row { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "rank name value" "track track track"; row-gap: 6px; padding: 6px 0; }
+  .bar-row > .rank-box { grid-area: rank; }
+  .bar-row > .bar-name { grid-area: name; }
+  .bar-row > .logo { display: none; }
+  .bar-row > .track { grid-area: track; }
+  .bar-row > .bar-value { grid-area: value; }
+  .chart-tools, .charts { padding-left: 16px; padding-right: 16px; }
+  .chart-note { padding: 0 16px 16px; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#view=overview">Personality Variety</a>
+    <nav class="nav" aria-label="Main">
+      <a data-view="overview" href="#view=overview">Overview</a>
+      <a data-view="board" href="#view=board">Leaderboard</a>
+      <a data-view="about" href="#view=about">How it works</a>
+    </nav>
+    <button class="theme-btn" id="theme-btn" type="button"></button>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script src="data/site_data.js"></script>
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/plot.umd.min.js"></script>
+<script>
+(() => {
+"use strict";
+
+const app = document.getElementById("app");
+if (!window.SITE_DATA || !window.Plot) {
+  app.textContent = "Data not found. Run `.venv/bin/python scripts/export_site_data.py` and keep vendor/ next to this file.";
+  return;
+}
+
+const LB = window.SITE_DATA.leaderboard;
+const KDE = window.SITE_DATA.kde;
+const TRAITS = LB.traits;
+const TYPES = LB.domains;
+// Mockup labels, not from the data export; check before publishing.
+const ORG = {
+  "llama-3.1": { org: "Meta", access: "Open weights", run: "Run locally (vLLM)" },
+  "llama-4": { org: "Meta", access: "Open weights", run: "Run via DeepInfra (fp8)" },
+  "ds-flash": { org: "DeepSeek", access: "Open weights", run: "Run via DeepInfra (fp8)" },
+  "ds-pro": { org: "DeepSeek", access: "Open weights", run: "Run via DeepInfra (fp8)" },
+  "qwen-397b-local": { org: "Alibaba", access: "Open weights", run: "Run locally (llama.cpp, 4-bit)" },
+};
+const MODELS = new Map(LB.models.map(m => [m.key, { ...m, ...(ORG[m.key] ?? { org: "Unknown", access: "" }) }]));
+// Descriptions follow the generation prompts in llm_traits/templates.py.
+const TYPE = {
+  all: { label: "Overall", icon: "🏆", about: "All six text types" },
+  reddit: { label: "Reddit", icon: "💬", about: "Reddit posts" },
+  news: { label: "News", icon: "📰", about: "News articles" },
+  abstracts: { label: "Abstracts", icon: "🔬", about: "Paper abstracts" },
+  reviews: { label: "Reviews", icon: "🎬", about: "Movie reviews" },
+  books: { label: "Books", icon: "📖", about: "Novel plot summaries" },
+  wiki: { label: "Wikipedia", icon: "🌐", about: "Wikipedia articles" },
+};
+const LENGTHS = [
+  { floor: 100, label: "100+ words" },
+  { floor: 500, label: "500+ words" },
+  { floor: 1000, label: "1,000+ words" },
+];
+const VIEWS = ["overview", "board", "model", "about"];
+const CELLS = new Map(LB.cells.map(c => [`${c.model}|${c.domain}|${c.floor}`, c]));
+
+// Plain-language glosses shown under each trait card title.
+const TRAIT_ABOUT = {
+  ope: "Curious vs. conventional",
+  con: "Organized vs. spontaneous",
+  ext: "Outgoing vs. reserved",
+  agr: "Warm vs. critical",
+  neu: "Anxious vs. calm",
+};
+
+const state = { view: "overview", group: "type", type: "all", floor: LB.default_floor, model: null, sort: { key: "rank", dir: 1 } };
+let chartType = null;   // text type picked in the model page's chart tabs
+let refocus = null;     // id of the control to focus again after a re-render
+
+const cellOf = (model, type, floor = state.floor) => CELLS.get(`${model}|${type}|${floor}`);
+const pct = v => v == null ? "—" : `${Math.round(v * 100)}%`;
+const int = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
+const lengthOf = floor => LENGTHS.find(l => l.floor === floor);
+// Bars in one list share a scale wide enough for 100% and any model above it.
+const scaleFor = values => Math.max(1.1, ...values.filter(v => v != null).map(v => v * 1.05));
+const dateLabel = new Date(`${LB.version}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else if (k === "style") node.style.cssText = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid != null) node.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return node;
+}
+
+// ---------- tooltip ----------
+const tip = document.getElementById("tip");
+function withTip(node, text) {
+  node.tabIndex = 0;
+  const show = e => {
+    tip.textContent = text();
+    tip.hidden = false;
+    const r = node.getBoundingClientRect();
+    const pointer = e.type.startsWith("pointer");
+    let x = pointer ? e.clientX + 14 : r.left;
+    let y = pointer ? e.clientY + 14 : r.bottom + 6;
+    if (x + tip.offsetWidth > innerWidth - 8) x = Math.max(8, innerWidth - tip.offsetWidth - 8);
+    if (y + tip.offsetHeight > innerHeight - 8) y = Math.max(8, y - tip.offsetHeight - 28);
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  };
+  node.addEventListener("pointerenter", show);
+  node.addEventListener("pointermove", show);
+  node.addEventListener("focus", show);
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("blur", hideTip);
+  return node;
+}
+function hideTip() { tip.hidden = true; }
+
+// ---------- state <-> URL ----------
+function hashFor(patch = {}) {
+  const s = { ...state, ...patch };
+  const p = new URLSearchParams({ view: s.view, type: s.type, words: s.floor });
+  if (s.view === "model" && s.model) p.set("model", s.model);
+  if (s.view === "overview" && s.group === "trait") p.set("group", "trait");
+  return `#${p}`;
+}
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const view = p.get("view");
+  state.view = VIEWS.includes(view) ? view : "overview";
+  const type = p.get("type");
+  state.type = type === "all" || TYPES.includes(type) ? type : "all";
+  const floor = Number(p.get("words"));
+  state.floor = LENGTHS.some(l => l.floor === floor) ? floor : LB.default_floor;
+  const model = p.get("model");
+  state.model = MODELS.has(model) ? model : null;
+  if (state.view === "model" && !state.model) state.view = "board";
+  state.group = p.get("group") === "trait" ? "trait" : "type";
+}
+function setState(patch) {
+  Object.assign(state, patch);
+  history.replaceState(null, "", hashFor());
+  render();
+}
+
+// ---------- shared pieces ----------
+function rankedRows(type) {
+  return LB.models
+    .map(m => ({ m: MODELS.get(m.key), c: cellOf(m.key, type) }))
+    .sort((a, b) => (a.c?.variety_rank ?? Infinity) - (b.c?.variety_rank ?? Infinity) || a.m.label.localeCompare(b.m.label));
+}
+
+function logo(m, big = false) {
+  return el("span", { class: big ? "logo big" : "logo", "aria-hidden": "true", text: m.org.charAt(0) });
+}
+
+function track(value, scaleMax) {
+  const width = value == null ? 0 : Math.min(100, 100 * value / scaleMax);
+  return el("span", { class: "track" },
+    el("span", { class: "fill", style: `width:${width.toFixed(1)}%` }),
+    el("span", { class: "marker", style: `left:${(100 / scaleMax).toFixed(2)}%` }));
+}
+
+function varietyTip(m, c, type) {
+  return () => `${m.label} · ${TYPE[type].label} · ${lengthOf(state.floor).label}\n` +
+               `Variety ${pct(c.variety)} (human = 100%)\n${int(c.n)} texts, avg. ${int(c.word_mean)} words`;
+}
+
+function lengthControl() {
+  const seg = el("div", { class: "seg", role: "group", "aria-label": "Text length" },
+    LENGTHS.map(l => {
+      const id = `len-${l.floor}`;
+      return el("button", { type: "button", id, "aria-pressed": String(l.floor === state.floor), text: l.label,
+                            onclick: () => { refocus = id; setState({ floor: l.floor }); } });
+    }));
+  return el("span", { class: "ctl" }, "Text length", seg);
+}
+
+function groupControl() {
+  const seg = el("div", { class: "seg", role: "group", "aria-label": "Group cards by" },
+    [["type", "Text type"], ["trait", "Trait"]].map(([key, label]) => {
+      const id = `group-${key}`;
+      return el("button", { type: "button", id, "aria-pressed": String(state.group === key), text: label,
+                            onclick: () => { refocus = id; setState({ group: key }); } });
+    }));
+  return el("span", { class: "ctl" }, "Group by", seg);
+}
+
+function metaRow(items, ...controls) {
+  return el("div", { class: "meta-row" }, items.map(t => el("span", { text: t })),
+    el("span", { class: "controls" }, controls, lengthControl()));
+}
+
+// Ranks rows by value, highest first; values equal as whole percents share a
+// rank, the same rule the export uses for variety_rank.
+function withRanks(rows, value) {
+  const ranked = rows.filter(r => value(r) != null)
+    .sort((a, b) => value(b) - value(a) || a.m.label.localeCompare(b.m.label));
+  let prev = null, rank = 0;
+  ranked.forEach((r, i) => {
+    const whole = Math.round(100 * value(r));
+    if (whole !== prev) { rank = i + 1; prev = whole; }
+    r.rank = rank;
+  });
+  return [...ranked, ...rows.filter(r => value(r) == null)];
+}
+
+function modelBar(m, rank, value, scaleMax, tip, type = "all") {
+  return el("li", { class: "bar-row" },
+    el("span", { class: "rank-box", text: rank ?? "–" }),
+    el("a", { class: "bar-name", href: hashFor({ view: "model", model: m.key, type }), text: m.label }),
+    logo(m),
+    value == null ? track(null, scaleMax) : withTip(track(value, scaleMax), tip),
+    el("span", { class: "bar-value", text: pct(value) }));
+}
+
+function markerKey() {
+  return el("span", { class: "marker-key" }, el("i"), "Human baseline = 100%");
+}
+
+// ---------- overview ----------
+function typeCard(type) {
+  const rows = rankedRows(type);
+  const scaleMax = scaleFor(rows.map(r => r.c?.variety));
+  const items = rows.map(({ m, c }) => modelBar(m, c?.variety_rank, c?.variety, scaleMax, varietyTip(m, c, type), type));
+
+  return el("section", { class: type === "all" ? "card wide" : "card" },
+    el("div", { class: "card-head" },
+      el("div", {},
+        el("h2", {}, el("a", { href: hashFor({ view: "board", type }) },
+          el("span", { class: "icon", "aria-hidden": "true", text: TYPE[type].icon }), TYPE[type].label)),
+        el("div", { class: "card-sub", text: TYPE[type].about }))),
+    el("ol", { class: "bar-list" }, items));
+}
+
+function overviewView() {
+  const texts = LB.models.reduce((sum, m) => sum + (cellOf(m.key, "all")?.n ?? 0), 0);
+  const byTrait = state.group === "trait";
+  return el("div", {},
+    el("header", { class: "page-head" },
+      el("h1", { text: "Leaderboard Overview" }),
+      el("p", { class: "lede", text: "We score each model's texts on the Big Five personality traits and compare the spread with human writing." }),
+      metaRow([`Updated ${dateLabel}`, `${LB.models.length} models`, `${int(texts)} texts`], groupControl()),
+      el("div", { class: "head-note" }, markerKey(),
+        byTrait ? "· Trait cards use all text types" : "· Click a card title for the full table")),
+    el("div", { class: "card-grid" }, typeCard("all"), byTrait ? TRAITS.map(traitCard) : TYPES.map(typeCard)));
+}
+
+function traitCard(t) {
+  const value = r => r.c?.[t.key]?.sd_ratio;
+  const rows = withRanks(LB.models.map(m => ({ m: MODELS.get(m.key), c: cellOf(m.key, "all") })), value);
+  const scaleMax = scaleFor(rows.map(value));
+  const items = rows.map(r => modelBar(r.m, r.rank, value(r), scaleMax,
+    () => `${r.m.label} · ${t.label} · ${lengthOf(state.floor).label}\nVariety ${pct(value(r))} (human = 100%)\nAll text types`));
+  return el("section", { class: "card" },
+    el("div", { class: "card-head" },
+      el("div", {}, el("h2", { text: t.label }), el("div", { class: "card-sub", text: TRAIT_ABOUT[t.key] ?? "" }))),
+    el("ol", { class: "bar-list" }, items));
+}
+
+// ---------- leaderboard table ----------
+const SORT_VALUE = {
+  rank: r => r.c?.variety_rank,
+  model: r => r.m.label.toLowerCase(),
+  variety: r => r.c?.variety,
+};
+for (const t of TRAITS) SORT_VALUE[t.key] = r => r.c?.[t.key]?.sd_ratio;
+
+function sortRows(rows) {
+  const get = SORT_VALUE[state.sort.key];
+  const dir = state.sort.dir;
+  return [...rows].sort((a, b) => {
+    const va = get(a), vb = get(b);
+    if (va == null || vb == null) return (va == null) - (vb == null) || a.m.label.localeCompare(b.m.label);
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir || a.m.label.localeCompare(b.m.label);
+  });
+}
+
+function sortTh(key, label, cls) {
+  const active = state.sort.key === key;
+  // Rank and name sort ascending first; scores sort highest first.
+  const firstDir = key === "rank" || key === "model" ? 1 : -1;
+  const id = `sort-${key}`;
+  const arrow = active ? (state.sort.dir > 0 ? "↑" : "↓") : "↕";
+  return el("th", { class: cls, scope: "col", "aria-sort": active ? (state.sort.dir > 0 ? "ascending" : "descending") : "none" },
+    el("button", { type: "button", id,
+                   onclick: () => { refocus = id; state.sort = { key, dir: active ? -state.sort.dir : firstDir }; render(); } },
+      label, el("span", { class: "arrow", "aria-hidden": "true", text: arrow })));
+}
+
+function boardView() {
+  const type = state.type;
+  const rows = rankedRows(type);
+  const scaleMax = scaleFor(rows.map(r => r.c?.variety));
+  const texts = rows.reduce((sum, r) => sum + (r.c?.n ?? 0), 0);
+
+  const sidebar = el("aside", { class: "sidebar" },
+    el("div", { class: "side-title", text: "Text type" }),
+    el("ul", { class: "side-list" }, ["all", ...TYPES].map(t => el("li", {},
+      el("a", { class: t === type ? "side-item active" : "side-item", href: hashFor({ view: "board", type: t }),
+                "aria-current": t === type ? "page" : null },
+        el("span", { class: "icon", "aria-hidden": "true", text: TYPE[t].icon }), TYPE[t].label,
+        t === type ? el("span", { class: "check", "aria-hidden": "true", text: "✓" }) : null)))));
+
+  const head = el("thead", {}, el("tr", {},
+    sortTh("rank", "Rank", "c rank"),
+    sortTh("model", "Model", "l"),
+    sortTh("variety", "Variety"),
+    TRAITS.map((t, i) => sortTh(t.key, t.label, i === 0 ? "divide" : null))));
+
+  const humanRow = el("tr", { class: "human" },
+    el("td", { class: "c rank", text: "—" }),
+    el("td", { class: "l" }, el("div", { class: "model-cell" },
+      el("span", { class: "logo", "aria-hidden": "true", text: "H" }),
+      el("div", {}, el("div", { class: "model-name", text: "Human writing" }), el("div", { class: "model-sub", text: "Baseline · RAID dataset" })))),
+    el("td", {}, el("span", { class: "variety-cell" }, track(1, scaleMax), el("b", { text: "100%" }))),
+    TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait", text: "100%" })));
+
+  const modelRows = sortRows(rows).map(({ m, c }) => {
+    const variety = c?.variety == null ? "—"
+      : el("span", { class: "variety-cell" }, withTip(track(c.variety, scaleMax), varietyTip(m, c, type)), el("b", { text: pct(c.variety) }));
+    return el("tr", { class: "row" },
+      el("td", { class: "c rank", text: c?.variety_rank ?? "—" }),
+      el("td", { class: "l" }, el("div", { class: "model-cell" }, logo(m),
+        el("div", {},
+          el("a", { class: "model-name", href: hashFor({ view: "model", model: m.key }), text: m.label }),
+          el("div", { class: "model-sub", text: `${m.org} · ${m.access}` })))),
+      el("td", {}, variety),
+      TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait", text: pct(c?.[t.key]?.sd_ratio) })));
+  });
+
+  const main = el("div", {},
+    el("header", { class: "page-head" },
+      el("h1", {}, "Personality Variety",
+        el("span", { class: "badge" }, el("span", { "aria-hidden": "true", text: TYPE[type].icon }), TYPE[type].label)),
+      el("p", { class: "lede", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}. Ranked most varied first; human writing is the 100% baseline.` }),
+      metaRow([`Updated ${dateLabel}`, `${rows.length} models`, `${int(texts)} texts`])),
+    el("div", { class: "card table-card" }, el("table", {}, head, el("tbody", {}, humanRow, modelRows))),
+    el("p", { class: "table-note", text: "Variety = average of the five traits. The line on each bar marks human writing, which a model can rank above. Click a model for details." }));
+
+  return el("div", { class: "board-layout" }, sidebar, main);
+}
+
+// ---------- model page ----------
+function tile(label, value, sub, isText = false) {
+  return el("div", { class: "card tile" },
+    el("div", { class: "tile-label", text: label }),
+    el("div", { class: isText ? "tile-value text" : "tile-value", text: value }),
+    el("div", { class: "tile-sub", text: sub }));
+}
+
+function modelView() {
+  const m = MODELS.get(state.model);
+  const type = state.type;
+  const c = cellOf(m.key, type);
+  const ranked = rankedRows(type).filter(r => r.c?.variety_rank != null).length;
+  const traits = TRAITS.map(t => ({ t, v: c?.[t.key]?.sd_ratio })).filter(x => x.v != null).sort((a, b) => b.v - a.v);
+  const most = traits[0], least = traits[traits.length - 1];
+  const byType = TYPES.map(t => ({ t, c: cellOf(m.key, t) }));
+  const scaleMax = scaleFor(byType.map(r => r.c?.variety));
+  const shown = chartType ?? (type === "all" ? TYPES[0] : type);
+  const shownCell = cellOf(m.key, shown);
+
+  const head = el("header", { class: "page-head" },
+    el("nav", { class: "crumbs", "aria-label": "Breadcrumb" },
+      el("a", { href: hashFor({ view: "board", model: null }), text: "Leaderboard" }), " / ", m.label),
+    el("div", { class: "model-head" }, logo(m, true),
+      el("div", {},
+        el("h1", { text: m.label }),
+        el("div", { class: "model-sub", text: `${m.org} · ${m.access} · ${m.run ?? m.note}` }))),
+    metaRow([`${TYPE[type].icon} ${TYPE[type].label}`, `Updated ${dateLabel}`]));
+
+  const tiles = el("div", { class: "tiles" },
+    tile("Variety", pct(c?.variety), "Human baseline = 100%"),
+    tile("Rank", c?.variety_rank == null ? "—" : `#${c.variety_rank}`, `of ${ranked} models`),
+    tile("Most varied", most ? most.t.label : "—", most ? pct(most.v) : "", true),
+    tile("Least varied", least ? least.t.label : "—", least ? pct(least.v) : "", true));
+
+  const byTypeCard = el("section", { class: "card" },
+    el("div", { class: "card-head" },
+      el("div", {}, el("h2", { text: "By text type" }), el("div", { class: "card-sub", text: lengthOf(state.floor).label })),
+      markerKey()),
+    el("ol", { class: "bar-list" }, byType.map(({ t, c: tc }) => el("li", { class: t === type ? "bar-row type-row current" : "bar-row type-row" },
+      el("span", { class: "rank-box icon-box", "aria-hidden": "true", text: TYPE[t].icon }),
+      el("a", { class: "bar-name", href: hashFor({ type: t }), text: TYPE[t].label }),
+      tc?.variety == null ? track(null, scaleMax) : withTip(track(tc.variety, scaleMax), varietyTip(m, tc, t)),
+      el("span", { class: "bar-value", text: pct(tc?.variety) })))));
+
+  const tabs = el("div", { class: "seg", role: "group", "aria-label": "Text type shown in the charts" },
+    TYPES.map(t => el("button", { type: "button", id: `tab-${t}`, "aria-pressed": String(t === shown), text: TYPE[t].label,
+                                  onclick: () => { chartType = t; refocus = `tab-${t}`; render(); } })));
+
+  const spreadCard = el("section", { class: "card" },
+    el("div", { class: "card-head" },
+      el("div", {}, el("h2", { text: "Score spread" }),
+        el("div", { class: "card-sub", text: "Wider curve = more variety" }))),
+    el("div", { class: "chart-tools" }, tabs,
+      el("div", { class: "legend" },
+        el("span", {}, el("i", { class: "key", style: "background: var(--accent)" }), m.label),
+        el("span", {}, el("i", { class: "key", style: "background: var(--human)" }), "Human writing"))),
+    el("div", { class: "charts" }, TRAITS.map(t => el("figure", { class: "chart" },
+      el("figcaption", {}, el("b", { text: t.label }), el("span", { text: pct(shownCell?.[t.key]?.sd_ratio) })),
+      el("div", { class: "chart-host", "data-type": shown, "data-trait": t.key })))),
+    el("p", { class: "chart-note", text: `Grey curve: all ${int(LB.human[shown].kde_n)} human ${TYPE[shown].label} texts \u2014 the same sample the percentages divide by.` }));
+
+  const traitScale = scaleFor(TRAITS.map(t => c?.[t.key]?.sd_ratio));
+  const traitBars = el("section", { class: "card" },
+    el("div", { class: "card-head" },
+      el("div", {}, el("h2", { text: "By trait" }),
+        el("div", { class: "card-sub", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}` }))),
+    el("ol", { class: "bar-list" }, TRAITS.map(t => {
+      const v = c?.[t.key]?.sd_ratio;
+      return el("li", { class: "bar-row type-row" },
+        el("span", { class: "rank-box", "aria-hidden": "true", text: t.label.charAt(0) }),
+        el("span", { class: "bar-name", text: t.label }),
+        v == null ? track(null, traitScale) : withTip(track(v, traitScale), () => `${m.label} · ${t.label}\nVariety ${pct(v)} (human = 100%)`),
+        el("span", { class: "bar-value", text: pct(v) }));
+    })));
+
+  return el("div", {}, head, tiles, el("div", { class: "stack" }, el("div", { class: "two-up" }, byTypeCard, traitBars), spreadCard));
+}
+
+function drawChart(host) {
+  const { type, trait } = host.dataset;
+  const y = KDE.llm[state.model]?.[String(state.floor)]?.[type]?.[trait];
+  if (!y) { host.textContent = "No data"; return; }
+  const css = getComputedStyle(document.documentElement);
+  const color = name => css.getPropertyValue(name).trim();
+  const human = KDE.human[type][trait];
+  const data = KDE.x[type][trait].map((x, i) => ({ x, model: y[i], human: human[i] }));
+  host.replaceChildren(Plot.plot({
+    width: Math.max(140, Math.floor(host.clientWidth)), height: 120,
+    marginTop: 4, marginRight: 2, marginBottom: 4, marginLeft: 2,
+    style: { background: "transparent" },
+    x: { axis: null },
+    y: { axis: null, domain: [0, d3.max(data, d => Math.max(d.model, d.human)) * 1.06] },
+    marks: [
+      Plot.areaY(data, { x: "x", y: "human", fill: color("--human"), fillOpacity: 0.2 }),
+      Plot.lineY(data, { x: "x", y: "human", stroke: color("--human"), strokeWidth: 2 }),
+      Plot.areaY(data, { x: "x", y: "model", fill: color("--accent"), fillOpacity: 0.12 }),
+      Plot.lineY(data, { x: "x", y: "model", stroke: color("--accent"), strokeWidth: 2 }),
+      Plot.ruleY([0], { stroke: color("--line") }),
+    ],
+  }));
+}
+
+// ---------- about ----------
+function aboutView() {
+  // Documents behind the human SD, per text type; the same sample the KDE curves draw.
+  const humanDocs = TYPES.map(t => LB.human[t].kde_n ?? LB.human[t].n);
+  const sections = [
+    ["What we measure", [
+      "Each model wrote about 100 texts per text type and length, with default settings.",
+      "A language-based assessment (built with DLATK) scored every text on the Big Five traits: openness, conscientiousness, extraversion, agreeableness and neuroticism.",
+    ]],
+    ["How variety is scored", [
+      "For each trait, we divide the spread of a model's scores (standard deviation) by the spread in human writing of the same type. 100% means as varied as people, and a model can score above it.",
+      "A model's variety is the average of its five traits. Models are ranked most varied first, so this ranks how much personality varies \u2014 not how close a model is to human writing. Equal whole percentages share a rank.",
+    ]],
+    ["Caveats", [
+      "This is variety in personality, not in wording or topic.",
+      "Shorter texts tend to score higher, so compare models at the same length.",
+      "High variety is not always good: incoherent text varies a lot too.",
+    ]],
+    ["Data", [
+      `Snapshot: ${dateLabel}. Human baseline: ${int(humanDocs.reduce((a, b) => a + b, 0))} human-written RAID texts, ${int(Math.min(...humanDocs))} to ${int(Math.max(...humanDocs))} per text type.`,
+      "Text types: Reddit posts, news articles, paper abstracts, movie reviews, novel plot summaries and Wikipedia articles.",
+    ]],
+  ];
+  return el("div", {},
+    el("header", { class: "page-head" }, el("h1", { text: "How it works" })),
+    el("div", { class: "about-grid" }, sections.map(([title, paragraphs]) => el("section", { class: "card about-card" },
+      el("h2", { text: title }), paragraphs.map(p => el("p", { text: p }))))));
+}
+
+// ---------- theme ----------
+const THEMES = ["light", "dark", "auto"];
+const themeBtn = document.getElementById("theme-btn");
+let theme = "light";
+try { if (THEMES.includes(localStorage.getItem("pv-theme"))) theme = localStorage.getItem("pv-theme"); } catch (_) {}
+function applyTheme() {
+  if (theme === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  themeBtn.textContent = `Theme: ${theme}`;
+}
+themeBtn.addEventListener("click", () => {
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  try { localStorage.setItem("pv-theme", theme); } catch (_) {}
+  applyTheme();
+  render();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+
+// ---------- render ----------
+function render() {
+  hideTip();
+  for (const a of document.querySelectorAll(".nav a")) {
+    const view = a.dataset.view;
+    a.href = hashFor({ view, model: null });
+    const current = view === state.view || (view === "board" && state.view === "model");
+    if (current) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  }
+  const build = { overview: overviewView, board: boardView, model: modelView, about: aboutView }[state.view];
+  app.replaceChildren(build());
+  app.querySelectorAll(".chart-host").forEach(drawChart);
+  if (refocus) {
+    document.getElementById(refocus)?.focus();
+    refocus = null;
+  }
+  const titles = { overview: "Overview", board: `${TYPE[state.type].label} leaderboard`, about: "How it works",
+                   model: state.model ? MODELS.get(state.model).label : "" };
+  document.title = `${titles[state.view]} · Personality Variety Leaderboard`;
+}
+
+window.addEventListener("hashchange", () => {
+  const before = { view: state.view, model: state.model, type: state.type };
+  readHash();
+  if (state.model !== before.model || state.type !== before.type) chartType = null;
+  render();
+  if (state.view !== before.view || state.model !== before.model) window.scrollTo(0, 0);
+});
+let lastWidth = innerWidth, resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (state.view === "model" && innerWidth !== lastWidth) render();
+    lastWidth = innerWidth;
+  }, 150);
+});
+window.addEventListener("scroll", hideTip, { passive: true });
+
+readHash();
+applyTheme();
+render();
+})();
+</script>
+</body>
+</html>
