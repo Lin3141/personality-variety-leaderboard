@@ -90,6 +90,7 @@ h1 { font-family: var(--serif); font-weight: 400; font-size: 36px; line-height: 
 /* Bar grows from a square baseline; the thin marker is human writing (100%). */
 .track { position: relative; display: block; height: 18px; background: var(--track); border-radius: 3px; }
 .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 0 4px 4px 0; }
+.fill.neg { border-radius: 4px 0 0 4px; }
 .marker { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--marker); }
 .bar-value { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .head-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--ink-2); }
@@ -279,12 +280,27 @@ const TRAIT_ABOUT = {
   neu: "Anxious vs. calm",
 };
 
-const state = { view: "overview", group: "type", type: "all", floor: LB.default_floor, model: null, sort: { key: "rank", dir: 1 } };
+const state = { view: "overview", group: "type", type: "all", floor: LB.default_floor, model: null,
+                metric: "sd_ratio", sort: { key: "rank", dir: 1 } };
 let chartType = null;   // text type picked in the model page's chart tabs
 let refocus = null;     // id of the control to focus again after a re-render
 
 const cellOf = (model, type, floor = state.floor) => CELLS.get(`${model}|${type}|${floor}`);
 const pct = v => v == null ? "—" : `${Math.round(v * 100)}%`;
+// The trait columns can show any of these. Variety and the rank always stay on the
+// SD ratio, so switching metric changes what is displayed, never the ordering.
+const METRICS = [
+  { key: "sd_ratio", label: "SD ratio" },
+  { key: "sd", label: "SD" },
+  { key: "mean", label: "Mean" },
+];
+const num = v => v == null ? "—" : v.toFixed(2);
+const metricLabel = () => METRICS.find(x => x.key === state.metric).label;
+// SD ratio reads as a percentage of human; SD and mean are in the assessment's own units.
+const fmtMetric = v => state.metric === "sd_ratio" ? pct(v) : num(v);
+const traitValue = (cell, trait) => cell?.[trait]?.[state.metric];
+// The human baseline is 1.0 by definition in ratio terms, otherwise its own statistic.
+const humanValue = (type, trait) => state.metric === "sd_ratio" ? 1 : LB.human[type]?.[trait]?.[state.metric];
 const int = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
 const lengthOf = floor => LENGTHS.find(l => l.floor === floor);
 // Bars in one list share a scale wide enough for 100% and any model above it.
@@ -338,6 +354,7 @@ function hashFor(patch = {}) {
   const p = new URLSearchParams({ view: s.view, type: s.type, words: s.floor });
   if (s.view === "model" && s.model) p.set("model", s.model);
   if (s.view === "overview" && s.group === "trait") p.set("group", "trait");
+  if (s.view !== "overview" && s.metric !== "sd_ratio") p.set("metric", s.metric);
   return `#${p}`;
 }
 function readHash() {
@@ -352,6 +369,8 @@ function readHash() {
   state.model = MODELS.has(model) ? model : null;
   if (state.view === "model" && !state.model) state.view = "board";
   state.group = p.get("group") === "trait" ? "trait" : "type";
+  const metric = p.get("metric");
+  state.metric = METRICS.some(x => x.key === metric) ? metric : "sd_ratio";
 }
 function setState(patch) {
   Object.assign(state, patch);
@@ -377,6 +396,26 @@ function track(value, scaleMax) {
     el("span", { class: "marker", style: `left:${(100 / scaleMax).toFixed(2)}%` }));
 }
 
+// One bar on a shared [lo, hi] scale, grown from the zero line, with a thin marker at
+// the human baseline. Means run negative, so the fill can grow to the left of zero.
+function metricTrack(value, human, [lo, hi]) {
+  const at = v => Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo)));
+  const zero = at(0);
+  const end = value == null ? zero : at(value);
+  return el("span", { class: "track" },
+    el("span", { class: end < zero ? "fill neg" : "fill",
+                 style: `left:${Math.min(zero, end).toFixed(1)}%; width:${Math.abs(end - zero).toFixed(1)}%` }),
+    human == null ? null : el("span", { class: "marker", style: `left:${at(human).toFixed(2)}%` }));
+}
+
+// A scale wide enough for every bar, its human marker and zero.
+function metricScale(values) {
+  const all = values.filter(v => v != null).concat(0);
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.05 || 1;
+  return [lo < 0 ? lo - pad : 0, hi + pad];
+}
+
 function varietyTip(m, c, type) {
   return () => `${m.label} · ${TYPE[type].label} · ${lengthOf(state.floor).label}\n` +
                `Variety ${pct(c.variety)} (human = 100%)\n${int(c.n)} texts, avg. ${int(c.word_mean)} words`;
@@ -390,6 +429,16 @@ function lengthControl() {
                             onclick: () => { refocus = id; setState({ floor: l.floor }); } });
     }));
   return el("span", { class: "ctl" }, "Text length", seg);
+}
+
+function metricControl() {
+  const seg = el("div", { class: "seg", role: "group", "aria-label": "Metric" },
+    METRICS.map(x => {
+      const id = `metric-${x.key}`;
+      return el("button", { type: "button", id, "aria-pressed": String(x.key === state.metric), text: x.label,
+                            onclick: () => { refocus = id; setState({ metric: x.key }); } });
+    }));
+  return el("span", { class: "ctl" }, "Metric", seg);
 }
 
 function groupControl() {
@@ -430,8 +479,9 @@ function modelBar(m, rank, value, scaleMax, tip, type = "all") {
     el("span", { class: "bar-value", text: pct(value) }));
 }
 
-function markerKey() {
-  return el("span", { class: "marker-key" }, el("i"), "Human baseline = 100%");
+function markerKey(fmt) {
+  return el("span", { class: "marker-key" }, el("i"),
+    fmt ? `Human baseline (${metricLabel()})` : "Human baseline = 100%");
 }
 
 // ---------- overview ----------
@@ -474,13 +524,21 @@ function traitCard(t) {
     el("ol", { class: "bar-list" }, items));
 }
 
+// What the five trait columns mean under each metric. Mean is the one that invites a
+// wrong reading: the assessment is not calibrated across text types.
+const METRIC_NOTE = {
+  sd_ratio: "SD ratio = the model's spread divided by human spread, so 100% is as varied as people.",
+  sd: "SD = how far the model's texts spread on each trait, in the assessment's own units; the human row is the same statistic for human writing.",
+  mean: "Mean = the model's average score on each trait, in the assessment's own units. These levels are not calibrated across text types, so compare down a column, not across one.",
+};
+
 // ---------- leaderboard table ----------
 const SORT_VALUE = {
   rank: r => r.c?.variety_rank,
   model: r => r.m.label.toLowerCase(),
   variety: r => r.c?.variety,
 };
-for (const t of TRAITS) SORT_VALUE[t.key] = r => r.c?.[t.key]?.sd_ratio;
+for (const t of TRAITS) SORT_VALUE[t.key] = r => traitValue(r.c, t.key);
 
 function sortRows(rows) {
   const get = SORT_VALUE[state.sort.key];
@@ -530,7 +588,8 @@ function boardView() {
       el("span", { class: "logo", "aria-hidden": "true", text: "H" }),
       el("div", {}, el("div", { class: "model-name", text: "Human writing" }), el("div", { class: "model-sub", text: "Baseline · RAID dataset" })))),
     el("td", {}, el("span", { class: "variety-cell" }, track(1, scaleMax), el("b", { text: "100%" }))),
-    TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait", text: "100%" })));
+    TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait",
+                                    text: fmtMetric(humanValue(type, t.key)) })));
 
   const modelRows = sortRows(rows).map(({ m, c }) => {
     const variety = c?.variety == null ? "—"
@@ -542,7 +601,8 @@ function boardView() {
           el("a", { class: "model-name", href: hashFor({ view: "model", model: m.key }), text: m.label }),
           el("div", { class: "model-sub", text: `${m.org} · ${m.access}` })))),
       el("td", {}, variety),
-      TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait", text: pct(c?.[t.key]?.sd_ratio) })));
+      TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait",
+                                      text: fmtMetric(traitValue(c, t.key)) })));
   });
 
   const main = el("div", {},
@@ -550,9 +610,9 @@ function boardView() {
       el("h1", {}, "Personality Variety",
         el("span", { class: "badge" }, el("span", { "aria-hidden": "true", text: TYPE[type].icon }), TYPE[type].label)),
       el("p", { class: "lede", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}. Ranked most varied first; human writing is the 100% baseline.` }),
-      metaRow([`Updated ${dateLabel}`, `${rows.length} models`, `${int(texts)} texts`])),
+      metaRow([`Updated ${dateLabel}`, `${rows.length} models`, `${int(texts)} texts`], metricControl())),
     el("div", { class: "card table-card" }, el("table", {}, head, el("tbody", {}, humanRow, modelRows))),
-    el("p", { class: "table-note", text: "Variety = average of the five traits. The line on each bar marks human writing, which a model can rank above. Click a model for details." }));
+    el("p", { class: "table-note", text: `${METRIC_NOTE[state.metric]} Variety and the rank always use the SD ratio. Click a model for details.` }));
 
   return el("div", { class: "board-layout" }, sidebar, main);
 }
@@ -584,7 +644,7 @@ function modelView() {
       el("div", {},
         el("h1", { text: m.label }),
         el("div", { class: "model-sub", text: `${m.org} · ${m.access} · ${m.run ?? m.note}` }))),
-    metaRow([`${TYPE[type].icon} ${TYPE[type].label}`, `Updated ${dateLabel}`]));
+    metaRow([`${TYPE[type].icon} ${TYPE[type].label}`, `Updated ${dateLabel}`], metricControl()));
 
   const tiles = el("div", { class: "tiles" },
     tile("Variety", pct(c?.variety), "Human baseline = 100%"),
@@ -615,23 +675,23 @@ function modelView() {
         el("span", {}, el("i", { class: "key", style: "background: var(--accent)" }), m.label),
         el("span", {}, el("i", { class: "key", style: "background: var(--human)" }), "Human writing"))),
     el("div", { class: "charts" }, TRAITS.map(t => el("figure", { class: "chart" },
-      el("figcaption", {}, el("b", { text: t.label }), el("span", { text: pct(shownCell?.[t.key]?.sd_ratio) })),
+      el("figcaption", {}, el("b", { text: t.label }), el("span", { text: fmtMetric(traitValue(shownCell, t.key)) })),
       el("div", { class: "chart-host", "data-type": shown, "data-trait": t.key })))),
     el("p", { class: "chart-note", text: `Grey curve: all ${int(LB.human[shown].kde_n)} human ${TYPE[shown].label} texts \u2014 the same sample the percentages divide by.` }));
 
-  const traitScale = scaleFor(TRAITS.map(t => c?.[t.key]?.sd_ratio));
+  const traitRows = TRAITS.map(t => ({ t, v: traitValue(c, t.key), h: humanValue(type, t.key) }));
+  const traitScale = metricScale(traitRows.flatMap(r => [r.v, r.h]));
   const traitBars = el("section", { class: "card" },
     el("div", { class: "card-head" },
       el("div", {}, el("h2", { text: "By trait" }),
-        el("div", { class: "card-sub", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}` }))),
-    el("ol", { class: "bar-list" }, TRAITS.map(t => {
-      const v = c?.[t.key]?.sd_ratio;
-      return el("li", { class: "bar-row type-row" },
-        el("span", { class: "rank-box", "aria-hidden": "true", text: t.label.charAt(0) }),
-        el("span", { class: "bar-name", text: t.label }),
-        v == null ? track(null, traitScale) : withTip(track(v, traitScale), () => `${m.label} · ${t.label}\nVariety ${pct(v)} (human = 100%)`),
-        el("span", { class: "bar-value", text: pct(v) }));
-    })));
+        el("div", { class: "card-sub", text: `${metricLabel()} · ${TYPE[type].about}, ${lengthOf(state.floor).label}` })),
+      markerKey(state.metric === "sd_ratio" ? null : fmtMetric)),
+    el("ol", { class: "bar-list" }, traitRows.map(({ t, v, h }) => el("li", { class: "bar-row type-row" },
+      el("span", { class: "rank-box", "aria-hidden": "true", text: t.label.charAt(0) }),
+      el("span", { class: "bar-name", text: t.label }),
+      withTip(metricTrack(v, h, traitScale),
+              () => `${m.label} · ${t.label}\n${metricLabel()} ${fmtMetric(v)} · human ${fmtMetric(h)}`),
+      el("span", { class: "bar-value", text: fmtMetric(v) })))));
 
   return el("div", {}, head, tiles, el("div", { class: "stack" }, el("div", { class: "two-up" }, byTypeCard, traitBars), spreadCard));
 }
