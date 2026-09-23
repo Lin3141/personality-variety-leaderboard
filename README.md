@@ -58,6 +58,11 @@ This is a working preview, not a result. Four issues are known and unresolved:
 "Default settings" also differ by provider, and decoding temperature affects output
 diversity directly.
 
+## Credits
+
+Brand marks come from [simple-icons](https://simpleicons.org) (CC0). The trademarks belong
+to their owners and appear here only to identify who made each model.
+
 ## Viewing locally
 
 The page reads its data from a `<script>` tag, not `fetch`, so opening `index.html`
