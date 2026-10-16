@@ -3,8 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Personality Variety Leaderboard</title>
+<title>Personality Leaderboard</title>
 <style>
 :root {
   color-scheme: light;
@@ -120,6 +119,10 @@ h1 { font-family: var(--serif); font-weight: 400; font-size: 36px; line-height: 
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 14px 16px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
 td.trait { color: var(--ink-2); }
+th.sc, th.var, td.sc, td.var { padding-left: 8px; padding-right: 8px; }
+td.var, th.var { padding-right: 14px; }
+th.wrap { white-space: normal; min-width: 76px; }
+td.overall { font-weight: 600; color: var(--ink); }
 th.divide, td.divide { border-left: 1px solid var(--line); }
 th { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 th button { border: 0; background: none; padding: 0; cursor: pointer; font-weight: 600; color: inherit; display: inline-flex; align-items: center; gap: 4px; }
@@ -140,7 +143,7 @@ a.model-name:hover { text-decoration: underline; }
 tr.human td { background: var(--panel-2); }
 tr.row:hover td { background: var(--panel-2); }
 .variety-cell { display: inline-flex; align-items: center; gap: 10px; }
-.variety-cell .track { width: 92px; height: 10px; }
+.variety-cell .track { width: 64px; height: 10px; }
 .variety-cell .marker { top: -3px; bottom: -3px; }
 .variety-cell b { width: 42px; text-align: right; }
 .table-note { margin: 10px 4px 0; font-size: 13px; color: var(--ink-2); }
@@ -178,6 +181,17 @@ tr.row:hover td { background: var(--panel-2); }
 
 .tip { position: fixed; z-index: 50; pointer-events: none; max-width: 320px; padding: 8px 10px; font-size: 13px; white-space: pre-line; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
 .tip[hidden] { display: none; }
+.tip.chart { width: 300px; white-space: normal; }
+.tip-title { font-weight: 600; }
+.tip-sub, .tip-key { color: var(--ink-2); font-size: 12px; }
+.tip-foot { margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tip-key { display: flex; gap: 12px; margin-top: 4px; }
+.tip-key span { display: inline-flex; align-items: center; gap: 5px; }
+.tip svg { display: block; margin: 4px 0; overflow: visible; }
+th.group { text-align: center; border-bottom: 0; padding-bottom: 4px; }
+th.group span { border-bottom: 1px dotted var(--ink-2); cursor: help; }
+td.sorted { color: var(--ink); font-weight: 600; }
+.ctl.subcol-ctl { display: none; }
 
 @media (max-width: 1000px) {
   .board-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -193,6 +207,9 @@ tr.row:hover td { background: var(--panel-2); }
   .card-grid, .about-grid { grid-template-columns: minmax(0, 1fr); }
   .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .meta-row .controls { margin-left: 0; }
+  /* Ten trait columns do not fit a phone: show Score or Variety, per the toggle. */
+  .ctl.subcol-ctl { display: inline-flex; }
+  table.show-score .var, table.show-variety .sc { display: none; }
 }
 @media (max-width: 640px) {
   /* Brand and theme on the first line, the three nav links on the second. */
@@ -223,7 +240,7 @@ tr.row:hover td { background: var(--panel-2); }
 <body>
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href="#view=overview">Personality Variety</a>
+    <a class="brand" href="#view=overview">Personality Leaderboard</a>
     <nav class="nav" aria-label="Main">
       <a data-view="overview" href="#view=overview">Overview</a>
       <a data-view="board" href="#view=board">Leaderboard</a>
@@ -299,27 +316,24 @@ const TRAIT_ABOUT = {
   neu: "Anxious vs. calm",
 };
 
-const state = { view: "overview", group: "type", type: "all", floor: LB.default_floor, model: null,
-                metric: "sd_ratio", sort: { key: "rank", dir: 1 } };
+const state = { view: "overview", show: "score", group: "type", type: "all", floor: LB.default_floor, model: null,
+                subcol: "score", sort: { key: "ope:score", dir: -1 } };
 let chartType = null;   // text type picked in the model page's chart tabs
 let refocus = null;     // id of the control to focus again after a re-render
 
 const cellOf = (model, type, floor = state.floor) => CELLS.get(`${model}|${type}|${floor}`);
 const pct = v => v == null ? "—" : `${Math.round(v * 100)}%`;
-// The trait columns can show any of these. Variety and the rank always stay on the
-// SD ratio, so switching metric changes what is displayed, never the ordering.
-const METRICS = [
-  { key: "sd_ratio", label: "SD ratio" },
-  { key: "sd", label: "SD" },
-  { key: "mean", label: "Mean" },
-];
-const num = v => v == null ? "—" : v.toFixed(2);
-const metricLabel = () => METRICS.find(x => x.key === state.metric).label;
-// SD ratio reads as a percentage of human; SD and mean are in the assessment's own units.
-const fmtMetric = v => state.metric === "sd_ratio" ? pct(v) : num(v);
-const traitValue = (cell, trait) => cell?.[trait]?.[state.metric];
-// The human baseline is 1.0 by definition in ratio terms, otherwise its own statistic.
-const humanValue = (type, trait) => state.metric === "sd_ratio" ? 1 : LB.human[type]?.[trait]?.[state.metric];
+// Score is the trait mean, centred by the export so human writing averages 0 over
+// all text types; variety is the SD ratio against human writing of the same type.
+const scoreOf = (cell, trait) => cell?.[trait]?.mean;
+const varietyOf = (cell, trait) => cell?.[trait]?.sd_ratio;
+const fmtScore = v => {
+  if (v == null) return "—";
+  const s = Math.abs(v).toFixed(2);
+  return s === "0.00" ? s : `${v > 0 ? "+" : "−"}${s}`;
+};
+const SCORE_DEF = "Score = the average trait score of the texts (mean), shifted so human writing averages 0 across all text types.";
+const VARIETY_DEF = "Variety = how widely the scores spread, divided by the spread in human writing of the same type (SD ratio). 100% is as varied as people.";
 const int = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
 const lengthOf = floor => LENGTHS.find(l => l.floor === floor);
 // Bars in one list share a scale wide enough for 100% and any model above it.
@@ -344,13 +358,14 @@ function el(tag, props = {}, ...kids) {
 
 // ---------- tooltip ----------
 const tip = document.getElementById("tip");
-function withTip(node, text) {
+// `content` returns text or a node; `cls` styles the box (e.g. "chart"). A touch
+// fires pointerenter and pointerleave back to back, so touch shows on the tap's
+// click and hides on blur, when the next tap lands elsewhere.
+function withTip(node, content, cls = "") {
   node.tabIndex = 0;
-  const show = e => {
-    tip.textContent = text();
-    tip.hidden = false;
+  const place = e => {
     const r = node.getBoundingClientRect();
-    const pointer = e.type.startsWith("pointer");
+    const pointer = e.clientX != null;
     let x = pointer ? e.clientX + 14 : r.left;
     let y = pointer ? e.clientY + 14 : r.bottom + 6;
     if (x + tip.offsetWidth > innerWidth - 8) x = Math.max(8, innerWidth - tip.offsetWidth - 8);
@@ -358,10 +373,19 @@ function withTip(node, text) {
     tip.style.left = `${x}px`;
     tip.style.top = `${y}px`;
   };
-  node.addEventListener("pointerenter", show);
-  node.addEventListener("pointermove", show);
+  const show = e => {
+    const c = content();
+    if (typeof c === "string") tip.textContent = c; else tip.replaceChildren(c);
+    tip.className = cls ? `tip ${cls}` : "tip";
+    tip.hidden = false;
+    place(e);
+  };
+  const mouse = e => e.pointerType !== "touch";
+  node.addEventListener("pointerenter", e => { if (mouse(e)) show(e); });
+  node.addEventListener("pointermove", e => { if (mouse(e) && !tip.hidden) place(e); });
+  node.addEventListener("pointerleave", e => { if (mouse(e)) hideTip(); });
+  node.addEventListener("click", e => { if (e.pointerType === "touch") show(e); });
   node.addEventListener("focus", show);
-  node.addEventListener("pointerleave", hideTip);
   node.addEventListener("blur", hideTip);
   return node;
 }
@@ -372,8 +396,8 @@ function hashFor(patch = {}) {
   const s = { ...state, ...patch };
   const p = new URLSearchParams({ view: s.view, type: s.type, words: s.floor });
   if (s.view === "model" && s.model) p.set("model", s.model);
-  if (s.view === "overview" && s.group === "trait") p.set("group", "trait");
-  if (s.view !== "overview" && s.metric !== "sd_ratio") p.set("metric", s.metric);
+  if (s.view === "overview" && s.show === "variety") p.set("show", "variety");
+  if (s.view === "overview" && s.show === "variety" && s.group === "trait") p.set("group", "trait");
   return `#${p}`;
 }
 function readHash() {
@@ -387,9 +411,8 @@ function readHash() {
   const model = p.get("model");
   state.model = MODELS.has(model) ? model : null;
   if (state.view === "model" && !state.model) state.view = "board";
+  state.show = p.get("show") === "variety" ? "variety" : "score";
   state.group = p.get("group") === "trait" ? "trait" : "type";
-  const metric = p.get("metric");
-  state.metric = METRICS.some(x => x.key === metric) ? metric : "sd_ratio";
 }
 function setState(patch) {
   Object.assign(state, patch);
@@ -455,14 +478,25 @@ function lengthControl() {
   return el("span", { class: "ctl" }, "Text length", seg);
 }
 
-function metricControl() {
-  const seg = el("div", { class: "seg", role: "group", "aria-label": "Metric" },
-    METRICS.map(x => {
-      const id = `metric-${x.key}`;
-      return el("button", { type: "button", id, "aria-pressed": String(x.key === state.metric), text: x.label,
-                            onclick: () => { refocus = id; setState({ metric: x.key }); } });
+// Narrow screens only (CSS hides it otherwise): which half of each trait to show.
+function subcolControl() {
+  const seg = el("div", { class: "seg", role: "group", "aria-label": "Trait columns" },
+    [["score", "Score"], ["variety", "Variety"]].map(([key, label]) => {
+      const id = `subcol-${key}`;
+      return el("button", { type: "button", id, "aria-pressed": String(state.subcol === key), text: label,
+                            onclick: () => { refocus = id; state.subcol = key; render(); } });
     }));
-  return el("span", { class: "ctl" }, "Metric", seg);
+  return el("span", { class: "ctl subcol-ctl" }, "Show", seg);
+}
+
+function showControl() {
+  const seg = el("div", { class: "seg", role: "group", "aria-label": "Show" },
+    [["score", "Score"], ["variety", "Variety"]].map(([key, label]) => {
+      const id = `show-${key}`;
+      return el("button", { type: "button", id, "aria-pressed": String(state.show === key), text: label,
+                            onclick: () => { refocus = id; setState({ show: key }); } });
+    }));
+  return el("span", { class: "ctl" }, "Show", seg);
 }
 
 function groupControl() {
@@ -503,9 +537,8 @@ function modelBar(m, rank, value, scaleMax, tip, type = "all") {
     el("span", { class: "bar-value", text: pct(value) }));
 }
 
-function markerKey(fmt) {
-  return el("span", { class: "marker-key" }, el("i"),
-    fmt ? `Human baseline (${metricLabel()})` : "Human baseline = 100%");
+function markerKey(label = "Human baseline = 100%") {
+  return el("span", { class: "marker-key" }, el("i"), label);
 }
 
 // ---------- overview ----------
@@ -525,15 +558,48 @@ function typeCard(type) {
 
 function overviewView() {
   const texts = LB.models.reduce((sum, m) => sum + (cellOf(m.key, "all")?.n ?? 0), 0);
+  const head = (lede, controls, note) => el("header", { class: "page-head" },
+    el("h1", { text: "Leaderboard Overview" }),
+    el("p", { class: "lede", text: lede }),
+    metaRow([`Updated ${dateLabel}`, `${LB.models.length} models`, `${int(texts)} texts`], ...controls),
+    el("div", { class: "head-note" }, note));
+  // Score first: which model is the most open, the most neurotic, ... There is no
+  // overall score (five different traits do not average), so score cards are per trait.
+  if (state.show === "score") {
+    return el("div", {},
+      head("We score each model's texts on the Big Five personality traits. Score is the average, with human writing at 0: above 0 means more of the trait than people write with.",
+           [showControl()],
+           [markerKey("Human writing = 0"), "· All text types · Click a card title for the full table"]),
+      el("div", { class: "card-grid" }, TRAITS.map(scoreCard)));
+  }
   const byTrait = state.group === "trait";
   return el("div", {},
-    el("header", { class: "page-head" },
-      el("h1", { text: "Leaderboard Overview" }),
-      el("p", { class: "lede", text: "We score each model's texts on the Big Five personality traits and compare the spread with human writing." }),
-      metaRow([`Updated ${dateLabel}`, `${LB.models.length} models`, `${int(texts)} texts`], groupControl()),
-      el("div", { class: "head-note" }, markerKey(),
-        byTrait ? "· Trait cards use all text types" : "· Click a card title for the full table")),
+    head("Variety is how widely a model's scores spread, as a percentage of the spread in human writing of the same type.",
+         [showControl(), groupControl()],
+         [markerKey(), byTrait ? "· Trait cards use all text types" : "· Click a card title for the full table"]),
     el("div", { class: "card-grid" }, typeCard("all"), byTrait ? TRAITS.map(traitCard) : TYPES.map(typeCard)));
+}
+
+// One trait, models ranked by score on all text types; bars grow from 0 (human).
+function scoreCard(t) {
+  const value = r => scoreOf(r.c, t.key);
+  const rows = withRanks(LB.models.map(m => ({ m: MODELS.get(m.key), c: cellOf(m.key, "all") })), value);
+  const scale = metricScale(rows.map(value));
+  const items = rows.map(r => el("li", { class: "bar-row" },
+    el("span", { class: "rank-box", text: r.rank ?? "–" }),
+    el("a", { class: "bar-name", href: hashFor({ view: "model", model: r.m.key, type: "all" }), text: r.m.label }),
+    logo(r.m),
+    value(r) == null ? metricTrack(null, 0, scale)
+      : withTip(metricTrack(value(r), 0, scale), () => chartTip(r.m, t, "all"), "chart"),
+    el("span", { class: "bar-value", text: fmtScore(value(r)) })));
+  // The title opens the table ranked by this trait's score.
+  const open = () => { state.sort = { key: `${t.key}:score`, dir: -1 }; };
+  return el("section", { class: "card" },
+    el("div", { class: "card-head" },
+      el("div", {},
+        el("h2", {}, el("a", { href: hashFor({ view: "board", type: "all" }), onclick: open, text: t.label })),
+        el("div", { class: "card-sub", text: `${TRAIT_ABOUT[t.key] ?? ""} · highest score first` }))),
+    el("ol", { class: "bar-list" }, items));
 }
 
 function traitCard(t) {
@@ -548,21 +614,18 @@ function traitCard(t) {
     el("ol", { class: "bar-list" }, items));
 }
 
-// What the five trait columns mean under each metric. Mean is the one that invites a
-// wrong reading: the assessment is not calibrated across text types.
-const METRIC_NOTE = {
-  sd_ratio: "SD ratio = the model's spread divided by human spread, so 100% is as varied as people.",
-  sd: "SD = how far the model's texts spread on each trait, in the assessment's own units; the human row is the same statistic for human writing.",
-  mean: "Mean = the model's average score on each trait, in the assessment's own units. These levels are not calibrated across text types, so compare down a column, not across one.",
-};
-
 // ---------- leaderboard table ----------
+// Keys are "model", "variety" (overall) and "<trait>:score" / "<trait>:variety".
 const SORT_VALUE = {
-  rank: r => r.c?.variety_rank,
   model: r => r.m.label.toLowerCase(),
   variety: r => r.c?.variety,
 };
-for (const t of TRAITS) SORT_VALUE[t.key] = r => traitValue(r.c, t.key);
+for (const t of TRAITS) {
+  SORT_VALUE[`${t.key}:score`] = r => scoreOf(r.c, t.key);
+  SORT_VALUE[`${t.key}:variety`] = r => varietyOf(r.c, t.key);
+}
+const sortLabel = key => key === "variety" ? "overall variety"
+  : `${TRAITS.find(t => key.startsWith(`${t.key}:`)).label} ${key.endsWith(":score") ? "score" : "variety"}`;
 
 function sortRows(rows) {
   const get = SORT_VALUE[state.sort.key];
@@ -574,13 +637,13 @@ function sortRows(rows) {
   });
 }
 
-function sortTh(key, label, cls) {
+function sortTh(key, label, cls, attrs = {}) {
   const active = state.sort.key === key;
-  // Rank and name sort ascending first; scores sort highest first.
-  const firstDir = key === "rank" || key === "model" ? 1 : -1;
-  const id = `sort-${key}`;
+  // Names sort A-Z first; scores and variety sort highest first.
+  const firstDir = key === "model" ? 1 : -1;
+  const id = `sort-${key.replace(":", "-")}`;
   const arrow = active ? (state.sort.dir > 0 ? "↑" : "↓") : "↕";
-  return el("th", { class: cls, scope: "col", "aria-sort": active ? (state.sort.dir > 0 ? "ascending" : "descending") : "none" },
+  return el("th", { class: cls, scope: "col", ...attrs, "aria-sort": active ? (state.sort.dir > 0 ? "ascending" : "descending") : "none" },
     el("button", { type: "button", id,
                    onclick: () => { refocus = id; state.sort = { key, dir: active ? -state.sort.dir : firstDir }; render(); } },
       label, el("span", { class: "arrow", "aria-hidden": "true", text: arrow })));
@@ -589,7 +652,6 @@ function sortTh(key, label, cls) {
 function boardView() {
   const type = state.type;
   const rows = rankedRows(type);
-  const scaleMax = scaleFor(rows.map(r => r.c?.variety));
   const texts = rows.reduce((sum, r) => sum + (r.c?.n ?? 0), 0);
 
   const sidebar = el("aside", { class: "sidebar" },
@@ -600,43 +662,66 @@ function boardView() {
         el("span", { class: "icon", "aria-hidden": "true", text: TYPE[t].icon }), TYPE[t].label,
         t === type ? el("span", { class: "check", "aria-hidden": "true", text: "✓" }) : null)))));
 
-  const head = el("thead", {}, el("tr", {},
-    sortTh("rank", "Rank", "c rank"),
-    sortTh("model", "Model", "l"),
-    sortTh("variety", "Variety"),
-    TRAITS.map((t, i) => sortTh(t.key, t.label, i === 0 ? "divide" : null))));
+  // Two header rows: each trait spans its Score and Variety sub-columns.
+  const groupTip = t => () => `${t.label} (${TRAIT_ABOUT[t.key]})\n${SCORE_DEF}\n${VARIETY_DEF}`;
+  const head = el("thead", {},
+    el("tr", {},
+      el("th", { class: "c rank", scope: "col", rowspan: 2, text: "Rank" }),
+      sortTh("model", "Model", "l", { rowspan: 2 }),
+      TRAITS.map(t => el("th", { class: "group divide", scope: "colgroup", colspan: 2 },
+        withTip(el("span", { text: t.label }), groupTip(t)))),
+      sortTh("variety", "Overall variety", "divide wrap", { rowspan: 2 })),
+    el("tr", {}, TRAITS.map(t => [
+      sortTh(`${t.key}:score`, "Score", "divide sc"),
+      sortTh(`${t.key}:variety`, "Variety", "var")])));
+
+  // Each trait cell opens its density plot; `on` marks the sorted column.
+  const traitCells = (m, c) => TRAITS.map(t => {
+    const on = kind => state.sort.key === `${t.key}:${kind}` ? " sorted" : "";
+    const cell = (cls, text) => {
+      const td = el("td", { class: cls, text });
+      return m && scoreOf(c, t.key) != null ? withTip(td, () => chartTip(m, t, type), "chart") : td;
+    };
+    return [cell(`trait divide sc${on("score")}`, fmtScore(scoreOf(c, t.key))),
+            cell(`trait var${on("variety")}`, pct(varietyOf(c, t.key)))];
+  });
 
   const humanRow = el("tr", { class: "human" },
     el("td", { class: "c rank", text: "—" }),
     el("td", { class: "l" }, el("div", { class: "model-cell" },
       el("span", { class: "logo", "aria-hidden": "true", text: "H" }),
       el("div", {}, el("div", { class: "model-name", text: "Human writing" }), el("div", { class: "model-sub", text: "Baseline · RAID dataset" })))),
-    el("td", {}, el("span", { class: "variety-cell" }, track(1, scaleMax), el("b", { text: "100%" }))),
-    TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait",
-                                    text: fmtMetric(humanValue(type, t.key)) })));
+    traitCells(null, LB.human[type] && Object.fromEntries(TRAITS.map(t =>
+      [t.key, { mean: LB.human[type][t.key].mean, sd_ratio: 1 }]))),
+    el("td", { class: "divide overall", text: "100%" }));
 
-  const modelRows = sortRows(rows).map(({ m, c }) => {
-    const variety = c?.variety == null ? "—"
-      : el("span", { class: "variety-cell" }, withTip(track(c.variety, scaleMax), varietyTip(m, c, type)), el("b", { text: pct(c.variety) }));
+  // Rank 1 = highest on the sorted column; reversing the sort keeps the ranks.
+  // Sorted by name, the rank falls back to overall variety.
+  withRanks(rows, SORT_VALUE[state.sort.key === "model" ? "variety" : state.sort.key]);
+  const modelRows = sortRows(rows).map(({ m, c, rank }) => {
+    const overall = el("td", { class: state.sort.key === "variety" ? "divide overall sorted" : "divide overall",
+                               text: pct(c?.variety) });
     return el("tr", { class: "row" },
-      el("td", { class: "c rank", text: c?.variety_rank ?? "—" }),
+      el("td", { class: "c rank", text: rank ?? "—" }),
       el("td", { class: "l" }, el("div", { class: "model-cell" }, logo(m),
         el("div", {},
           el("a", { class: "model-name", href: hashFor({ view: "model", model: m.key }), text: m.label }),
           el("div", { class: "model-sub", text: `${m.org} · ${m.access}` })))),
-      el("td", {}, variety),
-      TRAITS.map((t, i) => el("td", { class: i === 0 ? "trait divide" : "trait",
-                                      text: fmtMetric(traitValue(c, t.key)) })));
+      traitCells(m, c),
+      c?.variety == null ? overall : withTip(overall, varietyTip(m, c, type)));
   });
 
+  const rankedBy = state.sort.key === "model" ? "Sorted by name; ranks show overall variety"
+    : `Ranked by ${sortLabel(state.sort.key)}, highest first`;
   const main = el("div", {},
     el("header", { class: "page-head" },
-      el("h1", {}, "Personality Variety",
+      el("h1", {}, "Personality Leaderboard",
         el("span", { class: "badge" }, el("span", { "aria-hidden": "true", text: TYPE[type].icon }), TYPE[type].label)),
-      el("p", { class: "lede", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}. Ranked most varied first; human writing is the 100% baseline.` }),
-      metaRow([`Updated ${dateLabel}`, `${rows.length} models`, `${int(texts)} texts`], metricControl())),
-    el("div", { class: "card table-card" }, el("table", {}, head, el("tbody", {}, humanRow, modelRows))),
-    el("p", { class: "table-note", text: `${METRIC_NOTE[state.metric]} Variety and the rank always use the SD ratio. Click a model for details.` }));
+      el("p", { class: "lede", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}. ${rankedBy}. Click any column to rank by it.` }),
+      metaRow([`Updated ${dateLabel}`, `${rows.length} models`, `${int(texts)} texts`], subcolControl())),
+    el("div", { class: "card table-card" },
+      el("table", { class: `show-${state.subcol}` }, head, el("tbody", {}, humanRow, modelRows))),
+    el("p", { class: "table-note", text: `Score = mean; human writing averages 0. Variety = model SD ÷ human SD for the same text type; human = 100%. Hover a cell to see its distribution; click a model for details.` }));
 
   return el("div", { class: "board-layout" }, sidebar, main);
 }
@@ -668,11 +753,11 @@ function modelView() {
       el("div", {},
         el("h1", { text: m.label }),
         el("div", { class: "model-sub", text: `${m.org} · ${m.access} · ${m.run ?? m.note}` }))),
-    metaRow([`${TYPE[type].icon} ${TYPE[type].label}`, `Updated ${dateLabel}`], metricControl()));
+    metaRow([`${TYPE[type].icon} ${TYPE[type].label}`, `Updated ${dateLabel}`]));
 
   const tiles = el("div", { class: "tiles" },
     tile("Variety", pct(c?.variety), "Human baseline = 100%"),
-    tile("Rank", c?.variety_rank == null ? "—" : `#${c.variety_rank}`, `of ${ranked} models`),
+    tile("Variety rank", c?.variety_rank == null ? "—" : `#${c.variety_rank}`, `of ${ranked} models`),
     tile("Most varied", most ? most.t.label : "—", most ? pct(most.v) : "", true),
     tile("Least varied", least ? least.t.label : "—", least ? pct(least.v) : "", true));
 
@@ -696,45 +781,46 @@ function modelView() {
         // Name the text type: with the page on Overall, the By trait card above
         // averages all six while these charts show one, so the two disagree.
         el("div", { class: "card-sub",
-                    text: `${TYPE[shown].about}, ${lengthOf(state.floor).label} \u00b7 wider curve = more variety` }))),
-    el("div", { class: "chart-tools" }, tabs,
-      el("div", { class: "legend" },
-        el("span", {}, el("i", { class: "key", style: "background: var(--accent)" }), m.label),
-        el("span", {}, el("i", { class: "key", style: "background: var(--human)" }), "Human writing"))),
+                    text: `${TYPE[shown].about}, ${lengthOf(state.floor).label} \u00b7 bold line = score \u00b7 wider curve = more variety` }))),
+    el("div", { class: "chart-tools" }, tabs, chartLegend(m, "legend")),
     el("div", { class: "charts" }, TRAITS.map(t => el("figure", { class: "chart" },
-      el("figcaption", {}, el("b", { text: t.label }), el("span", { text: fmtMetric(traitValue(shownCell, t.key)) })),
+      el("figcaption", {}, el("b", { text: t.label }),
+        el("span", { text: `${fmtScore(scoreOf(shownCell, t.key))} \u00b7 ${pct(varietyOf(shownCell, t.key))}` })),
       el("div", { class: "chart-host", "data-type": shown, "data-trait": t.key })))),
     el("p", { class: "chart-note", text: `Grey curve: all ${int(LB.human[shown].n)} human ${TYPE[shown].label} texts \u2014 the same sample the percentages divide by.` }));
 
-  const traitRows = TRAITS.map(t => ({ t, v: traitValue(c, t.key), h: humanValue(type, t.key) }));
+  const traitRows = TRAITS.map(t => ({ t, v: scoreOf(c, t.key), h: LB.human[type]?.[t.key]?.mean }));
   const traitScale = metricScale(traitRows.flatMap(r => [r.v, r.h]));
   const traitBars = el("section", { class: "card" },
     el("div", { class: "card-head" },
       el("div", {}, el("h2", { text: "By trait" }),
-        el("div", { class: "card-sub", text: `${metricLabel()} · ${TYPE[type].about}, ${lengthOf(state.floor).label}` })),
-      markerKey(state.metric === "sd_ratio" ? null : fmtMetric)),
+        el("div", { class: "card-sub", text: `Score · ${TYPE[type].about}, ${lengthOf(state.floor).label}` })),
+      markerKey("Human score")),
     el("ol", { class: "bar-list" }, traitRows.map(({ t, v, h }) => el("li", { class: "bar-row type-row" },
       el("span", { class: "rank-box", "aria-hidden": "true", text: t.label.charAt(0) }),
       el("span", { class: "bar-name", text: t.label }),
       withTip(metricTrack(v, h, traitScale),
-              () => `${m.label} · ${t.label}\n${metricLabel()} ${fmtMetric(v)} · human ${fmtMetric(h)}`),
-      el("span", { class: "bar-value", text: fmtMetric(v) })))));
+              () => `${m.label} · ${t.label}\nScore ${fmtScore(v)} · human ${fmtScore(h)}\nVariety ${pct(varietyOf(c, t.key))}`),
+      el("span", { class: "bar-value", text: fmtScore(v) })))));
 
   return el("div", {}, head, tiles, el("div", { class: "stack" }, el("div", { class: "two-up" }, byTypeCard, traitBars), spreadCard));
 }
 
-function drawChart(host) {
-  const { type, trait } = host.dataset;
-  const y = KDE.llm[state.model]?.[String(state.floor)]?.[type]?.[trait];
-  if (!y) { host.textContent = "No data"; return; }
+// Model vs human density for one trait, with a bold line at the model's score and a
+// dashed one at the human score. The lines come from the leaderboard, not the
+// curves, so they sit exactly at the numbers the table shows.
+function densityPlot(model, type, trait, width, height) {
+  const y = KDE.llm[model]?.[String(state.floor)]?.[type]?.[trait];
+  if (!y) return null;
   const css = getComputedStyle(document.documentElement);
   const color = name => css.getPropertyValue(name).trim();
   const human = KDE.human[type][trait];
   const data = KDE.x[type][trait].map((x, i) => ({ x, model: y[i], human: human[i] }));
-  host.replaceChildren(Plot.plot({
-    width: Math.max(140, Math.floor(host.clientWidth)), height: 120,
-    marginTop: 4, marginRight: 2, marginBottom: 4, marginLeft: 2,
-    style: { background: "transparent" },
+  const score = scoreOf(cellOf(model, type), trait);
+  const humanScore = LB.human[type]?.[trait]?.mean;
+  return Plot.plot({
+    width, height, marginTop: 16, marginRight: 2, marginBottom: 16, marginLeft: 2,
+    style: { background: "transparent", overflow: "visible" },
     x: { axis: null },
     y: { axis: null, domain: [0, d3.max(data, d => Math.max(d.model, d.human)) * 1.06] },
     marks: [
@@ -743,8 +829,39 @@ function drawChart(host) {
       Plot.areaY(data, { x: "x", y: "model", fill: color("--accent"), fillOpacity: 0.12 }),
       Plot.lineY(data, { x: "x", y: "model", stroke: color("--accent"), strokeWidth: 2 }),
       Plot.ruleY([0], { stroke: color("--line") }),
-    ],
-  }));
+      humanScore == null ? null : [
+        Plot.ruleX([humanScore], { stroke: color("--ink-2"), strokeWidth: 1.5, strokeDasharray: "4,3" }),
+        Plot.text([humanScore], { x: d => d, text: () => "human", frameAnchor: "bottom", dy: 11,
+                                  fill: color("--ink-2"), fontSize: 10 })],
+      score == null ? null : [
+        Plot.ruleX([score], { stroke: color("--accent"), strokeWidth: 3 }),
+        Plot.text([score], { x: d => d, text: () => "score", frameAnchor: "top", dy: -9,
+                             fill: color("--accent"), fontSize: 11, fontWeight: 700 })],
+    ].flat().filter(Boolean),
+  });
+}
+
+function drawChart(host) {
+  const { type, trait } = host.dataset;
+  host.replaceChildren(densityPlot(state.model, type, trait, Math.max(140, Math.floor(host.clientWidth)), 140) ?? "No data");
+}
+
+function chartLegend(m, cls) {
+  return el("div", { class: cls },
+    el("span", {}, el("i", { class: "key", style: "background: var(--accent)" }), m.label),
+    el("span", {}, el("i", { class: "key", style: "background: var(--human)" }), "Human writing"));
+}
+
+// Hover popup for a table cell: the same plot as the model page, small.
+function chartTip(m, t, type) {
+  const c = cellOf(m.key, type);
+  return el("div", {},
+    el("div", { class: "tip-title", text: `${m.label} · ${t.label}` }),
+    el("div", { class: "tip-sub", text: `${TYPE[type].about}, ${lengthOf(state.floor).label}` }),
+    densityPlot(m.key, type, t.key, 278, 120) ?? el("div", { text: "No data" }),
+    el("div", { class: "tip-foot" }, el("b", { text: `Score ${fmtScore(scoreOf(c, t.key))}` }),
+      ` (human ${fmtScore(LB.human[type]?.[t.key]?.mean)}) · Variety ${pct(varietyOf(c, t.key))}`),
+    chartLegend(m, "tip-key"));
 }
 
 // ---------- about ----------
@@ -756,13 +873,22 @@ function aboutView() {
       "Each model wrote about 100 texts per text type and length, with default settings.",
       "A language-based assessment (built with DLATK) scored every text on the Big Five traits: openness, conscientiousness, extraversion, agreeableness and neuroticism.",
     ]],
-    ["How variety is scored", [
-      "For each trait, we divide the spread of a model's scores (standard deviation) by the spread in human writing of the same type. 100% means as varied as people, and a model can score above it.",
-      "A model's variety is the average of its five traits. Models are ranked most varied first, so this ranks how much personality varies \u2014 not how close a model is to human writing. Equal whole percentages share a rank.",
+    ["Score", [
+      "A model's score on a trait is the average (mean) of its texts' scores \u2014 \u201chow open is this model's writing?\u201d. We follow Fleeson in calling it a score.",
+      `Scores are shifted so human writing averages 0 across all six text types; the assessment's own zero point comes from its training data and carries no meaning here. Above 0 means more of the trait than the average human text. (Raw = score + ${TRAITS.map(t => `${LB.centre[t.key].toFixed(2)} for ${t.label}`).join(", ")}.)`,
+    ]],
+    ["Variety", [
+      "For each trait, we divide the spread of a model's scores (standard deviation) by the spread in human writing of the same type. 100% means as varied as people, and a model can score above it. Overall variety is the average over the five traits.",
+    ]],
+    ["Ranking", [
+      "Click any column to rank by it; rank 1 is the highest value in that column. Neither direction is \u201cbetter\u201d: a high neuroticism score is not a win. Values equal at the precision shown share a rank.",
     ]],
     ["Caveats", [
       "This is variety in personality, not in wording or topic.",
-      "Shorter texts tend to score higher, so compare models at the same length.",
+      "Shorter texts give noisier scores, so they look more varied; compare models at the same length.",
+      "The text-length setting filters model texts only. Human texts are always used at their natural length (about 180\u2013440 words on average), and Reddit posts, abstracts and Wikipedia articles have no human text of 500 words or more.",
+      "We have no demographics for the human writers, so the human baseline likely carries selection biases (for example, who posts on Reddit or reviews films).",
+      "The number of distinct human writers is unknown: RAID records no author. Reddit posts and movie reviews are written by individuals, but news, abstracts, plot summaries and Wikipedia articles are institutional, multi-author or collaboratively edited.",
       "High variety is not always good: incoherent text varies a lot too.",
     ]],
     ["Data", [
@@ -812,7 +938,7 @@ function render() {
   }
   const titles = { overview: "Overview", board: `${TYPE[state.type].label} leaderboard`, about: "How it works",
                    model: state.model ? MODELS.get(state.model).label : "" };
-  document.title = `${titles[state.view]} · Personality Variety Leaderboard`;
+  document.title = `${titles[state.view]} · Personality Leaderboard`;
 }
 
 window.addEventListener("hashchange", () => {
